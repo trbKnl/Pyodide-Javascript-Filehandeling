@@ -1,6 +1,6 @@
 # Minimal Pyodide testing code
 
-Code for experimenting how a objects from javascript can be passed to Pyodide. The idea is is that files from DDP will be very diverse, and won't only be zipfiles. Therefore, any object/multiple objects need to be able to be passed to Pyodide. 
+Code for experimentation and prototyping. Mainly to see how a objects from javascript can be passed to Pyodide. The idea is is that files from DDP will be very diverse, and won't only be zipfiles. Therefore, any object/multiple objects need to be able to be passed to Pyodide. 
 
 The idea is the following:
 
