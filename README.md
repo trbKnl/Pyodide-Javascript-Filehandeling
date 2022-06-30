@@ -1,6 +1,6 @@
 # Minimal Pyodide testing code
 
-Code for experimenting how a objects from javascript can be passed to Pyodide. The idea is is that files from DDP will be very diverse, and won't only be zipfiles. Therefore, any object and multiple objects need to be passed to Pyodide. 
+Code for experimenting how a objects from javascript can be passed to Pyodide. The idea is is that files from DDP will be very diverse, and won't only be zipfiles. Therefore, any object/multiple objects need to be able to be passed to Pyodide. 
 
 The idea is the following:
 
@@ -8,9 +8,9 @@ The idea is the following:
 sequenceDiagram
     participant J as Javascript
     participant P as Pyodide
-    Note left of J: use FileReader API with readAsArrayBuffer()
+    Note left of J: FileReader API with readAsArrayBuffer()
     J->>P: Send files in an Array containing ArrayBuffers 
-    Note right of P: transform ArrayBuffers to io.BytesIO()
+    Note right of P: ArrayBuffers to io.BytesIO()
     loop Process io.BytesIO objects
        P->>P: process io.BytesIO() accordingly
     end
@@ -30,4 +30,7 @@ I think what needs to be added is, MIME type information needs to be passed alon
 All code is in `index.html` for convenience except the pyodide API and the worker.
 
 Host with:
-`python3 -m http.server 8000 --bind localhost`
+
+```
+python3 -m http.server 8000 --bind localhost
+```
