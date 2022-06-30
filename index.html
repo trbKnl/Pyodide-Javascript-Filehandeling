@@ -18,6 +18,10 @@
         const inputfield = document.querySelector("#inputfield")
         const processFilesBtn = document.querySelector("#processfiles")
 
+        /*
+        *  Python script you want to apply to your files
+        */
+
         const pythonScript = `
         import io
         import random
@@ -69,6 +73,10 @@
             }
         }
 
+        /*
+        * The main program of this page
+        */
+
         // Click what should happen on button click
         // Handle multiple file uploads
         processFilesBtn.addEventListener("click", processFilesHandler)
@@ -89,6 +97,7 @@
                 return out
             }
 
+            // Read files send to webworker
             let arrayBufferArray = await handleFiles()
             if (arrayBufferArray.length) {
 
