@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>HTML 5 Boilerplate</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <input type="file" id="inputfield" multiple="multiple">
+    <button id="processfiles">Read Text Files</button>
+    <script src="./py-worker.js" type="module"></script>
+    <script type ="module">
+
+        import { asyncRun } from "./py-worker.js";
+        window.asyncRun = asyncRun
+        const inputfield = document.querySelector("#inputfield")
+        const processFilesBtn = document.querySelector("#processfiles")
+
+        const pythonScript = `
+        import io
+        import random
+
+        from js import array_buffer_list
+
+        def process_files_from_js(array_buffer_list):
+
+            for array_buffer in array_buffer_list:
+                myfile = io.BytesIO(array_buffer.to_py().tobytes())
+                print(myfile.getvalue())
+
+            return "done"
+
+        print(f"rand int: {random.randint(0, 10000)}")
+        process_files_from_js(array_buffer_list)
+        `
+
+        /*
+        * Helpers functions
+        */
+
+        // Promisify FileReader API
+        const readFileAsArrayBuffer = (inputf) => {
+            const fr = new FileReader()
+            return new Promise((resolve, reject) => {
+                fr.onerror = () => {
+                    fr.abort()
+                    reject(new DOMException(`Problem parsing input file: ${intputf}`))
+                }
+                fr.onload = () => {
+                    resolve(fr.result)
+                }
+                fr.readAsArrayBuffer(inputf)
+            })
+        }
+
+        // Run Python script: copy from Pyodide website
+        async function runPythonInWebworker(script, context) {
+            try {
+                const {results, error} = await asyncRun(script, context)
+                if (results) {
+                    return results
+                } else if (error) {
+                    console.log("pyodideWorker error: ", error)
+                }
+            } catch (e) {
+                console.log(`Error runPythonInWebworker: ${e}`)
+            }
+        }
+
+        // Click what should happen on button click
+        // Handle multiple file uploads
+        processFilesBtn.addEventListener("click", processFilesHandler)
+        async function processFilesHandler() {
+
+            async function handleFiles() {
+                let files = inputfield.files 
+                let out = []
+                for (let file of files) {
+                    if (!file.type.startsWith('text/')){ continue } // For testing only text, please change 
+                    try {
+                        let myArrayBuffer = await readFileAsArrayBuffer(file)
+                        out.push(myArrayBuffer)
+                    } catch(e) {
+                        console.log(`File cannot be read: ${e}`)
+                    }
+                }
+                return out
+            }
+
+            let arrayBufferArray = await handleFiles()
+            if (arrayBufferArray.length) {
+
+                const context = {array_buffer_list: arrayBufferArray}
+                let results = await runPythonInWebworker(pythonScript, context)
+                console.log(results)
+
+            } else {
+                console.log("no files")
+            }
+        }
+
+        
+    </script>
+  </body>
+</html>
