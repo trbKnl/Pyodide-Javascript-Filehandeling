@@ -9,34 +9,153 @@
   </head>
   <body>
     <input type="file" id="inputfield" multiple="multiple">
-    <button id="processfiles">Read Text Files</button>
+    <button id="processfiles">Process twitter zip</button>
     <script src="./py-worker.js" type="module"></script>
+    <p id="output">Output should appear here</p>
+
     <script type ="module">
 
         import { asyncRun } from "./py-worker.js";
         window.asyncRun = asyncRun
         const inputfield = document.querySelector("#inputfield")
         const processFilesBtn = document.querySelector("#processfiles")
+        const output = document.getElementById("output");
 
         /*
         *  Python script you want to apply to your files
         */
 
         const pythonScript = `
+
+        ###########################################################
+        # Explore zip
+
+        import zipfile
+        from pathlib import Path
+        import json
         import io
-        import random
+        import re
+
+        class FileNotFoundInZipError(Exception):
+            pass
+
+        class ObjectIsNotADict(Exception):
+            pass
+
+
+        def extract_file_from_zip(zipfilebuf, file_to_extract: str) -> io.BytesIO:
+            """
+            """
+
+            file_to_extract_bytes = io.BytesIO()
+
+            try :
+                zipfileBytesIO = io.BytesIO(zipfilebuf.to_py().tobytes())
+                zfile = zipfile.ZipFile(zipfileBytesIO)
+
+                file_found = False
+
+                for f in zfile.namelist():
+                    if Path(f).name == file_to_extract:
+                        file_to_extract_bytes = io.BytesIO(zfile.read(f))
+                        file_found = True
+                        break
+
+                if not file_found:
+                    raise FileNotFoundInZipError("File not found in zip")
+
+            except zipfile.BadZipFile as e:
+                # Insert logging
+                print(e)
+            except FileNotFoundInZipError as e:
+                # insert logging
+                print(e)
+            except Exception as e:
+                # insert logging
+                print(e)
+
+            finally:
+                return file_to_extract_bytes
+
+
+        def twitter_file_to_list(bytes_to_read: io.BytesIO) -> list[dict]:
+            """
+            Converts twitter.js file to a list of dicts
+            A list of dicts resembles the structure of twitter.js files
+            """
+
+            out = []
+            lines = []
+
+            try:
+                with io.TextIOWrapper(bytes_to_read, encoding ="utf8") as f:
+                    lines = f.readlines()
+
+                # remove first and element from list
+                lines[0] = re.sub('^.*? = ', '', lines[0])
+
+                # convert to a list of dicts
+                out = json.loads("".join(lines))
+
+            except json.decoder.JSONDecodeError as e :
+                # Insert logging
+                print(e)
+            except IndexError as e:
+                # Insert logging
+                print(f"{e}, readlines from bytesio did not succeed check input object ")
+            except Exception as e:
+                # insert logging
+                print(e)
+
+            finally:
+                return out
+
+
+        def extract_interests_from_listdict(interest_list: list[dict]) -> list:
+            """ 
+            This function extracts interests from dict 
+            """
+            out = []
+
+            try:
+                dict_with_interests = interest_list[0]
+
+                if not isinstance(dict_with_interests, dict):
+                    raise ObjectIsNotADict("The first item in interest_list is not a dict")
+
+                # traverse into the nested dict
+                for key in ["p13nData", "interests", "interests"]:
+                    dict_with_interests = dict_with_interests[key]
+
+                out = [d.get("name") for d in dict_with_interests]
+
+            except IndexError as e:
+                print(f"{e} input object is an empty list")
+            except ObjectIsNotADict as e:
+                print(e)
+            except KeyError as e:
+                print(f"Key: {e} not found, interest are not in dict")
+            except Exception as e:
+                print(e)
+
+            finally:
+                return out
+
 
         from js import array_buffer_list
 
         def process_files_from_js(array_buffer_list):
 
             for array_buffer in array_buffer_list:
-                myfile = io.BytesIO(array_buffer.to_py().tobytes())
-                print(myfile.getvalue())
 
-            return "done"
+                my_bytes = extract_file_from_zip(array_buffer, "personalization.js")  
+                my_dict = twitter_file_to_list(my_bytes)
+                check = extract_interests_from_listdict(my_dict)
+                print(check)
+                print("done")
 
-        print(f"rand int: {random.randint(0, 10000)}")
+            return "<br>".join(check)
+
         process_files_from_js(array_buffer_list)
         `
 
@@ -86,7 +205,7 @@
                 let files = inputfield.files 
                 let out = []
                 for (let file of files) {
-                    if (!file.type.startsWith('text/')){ continue } // For testing only text, please change 
+                    // if (!file.type.startsWith('text/')){ continue } // For testing only text, please change 
                     try {
                         let myArrayBuffer = await readFileAsArrayBuffer(file)
                         out.push(myArrayBuffer)
@@ -104,6 +223,7 @@
                 const context = {array_buffer_list: arrayBufferArray}
                 let results = await runPythonInWebworker(pythonScript, context)
                 console.log(results)
+                output.innerHTML = results
 
             } else {
                 console.log("no files")
