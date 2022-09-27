@@ -8,157 +8,96 @@
     <link rel="stylesheet" href="style.css">
   </head>
   <body>
-    <input type="file" id="inputfield" multiple="multiple">
-    <button id="processfiles">Process twitter zip</button>
+      <h3>Test Twitter DDP Processing</h3>
+    <input type="file" id="twitterInputField" multiple="multiple">
+    <button id="twitterProcess">Process twitter zip</button>
     <script src="./py-worker.js" type="module"></script>
-    <p id="output">Output should appear here</p>
+    <div id="twitterOutputDiv" style="overflow:scroll; height:150px; border-style: solid;">
+        Your inferred interests from should appear here!
+    </div>
+
+    <p>-----------------------------------------------------------</p>
+
+      <h3>Test Instagram DDP Processing</h3>
+    <input type="file" id="instagramInputField">
+    <button id="instagramProcess">Process instagram zip</button>
+    <script src="./py-worker.js" type="module"></script>
+    <div id="instagramOutputDiv" style="overflow:scroll; height:150px; border-style: solid;">
+        Your inferred interests and topics should appear here!
+    </div>
 
     <script type ="module">
 
         import { asyncRun } from "./py-worker.js";
         window.asyncRun = asyncRun
-        const inputfield = document.querySelector("#inputfield")
-        const processFilesBtn = document.querySelector("#processfiles")
-        const output = document.getElementById("output");
+        const twitterInputField = document.querySelector("#twitterInputField")
+        const twitterProcessButton = document.querySelector("#twitterProcess")
+        const twitterOutputDiv = document.getElementById("twitterOutputDiv");
+
+        const instagramInputField = document.querySelector("#instagramInputField")
+        const instagramProcessButton = document.querySelector("#instagramProcess")
+        const instagramOutputDiv = document.getElementById("instagramOutputDiv");
 
         /*
         *  Python script you want to apply to your files
         */
 
-        const pythonScript = `
-
-        ###########################################################
-        # Explore zip
-
-        import zipfile
-        from pathlib import Path
-        import json
+        const readTwitterScript = `
         import io
-        import re
+        import logging
+        logging.basicConfig(level=logging.INFO)
 
-        class FileNotFoundInZipError(Exception):
-            pass
-
-        class ObjectIsNotADict(Exception):
-            pass
-
-
-        def extract_file_from_zip(zipfilebuf, file_to_extract: str) -> io.BytesIO:
-            """
-            """
-
-            file_to_extract_bytes = io.BytesIO()
-
-            try :
-                zipfileBytesIO = io.BytesIO(zipfilebuf.to_py().tobytes())
-                zfile = zipfile.ZipFile(zipfileBytesIO)
-
-                file_found = False
-
-                for f in zfile.namelist():
-                    if Path(f).name == file_to_extract:
-                        file_to_extract_bytes = io.BytesIO(zfile.read(f))
-                        file_found = True
-                        break
-
-                if not file_found:
-                    raise FileNotFoundInZipError("File not found in zip")
-
-            except zipfile.BadZipFile as e:
-                # Insert logging
-                print(e)
-            except FileNotFoundInZipError as e:
-                # insert logging
-                print(e)
-            except Exception as e:
-                # insert logging
-                print(e)
-
-            finally:
-                return file_to_extract_bytes
-
-
-        def twitter_file_to_list(bytes_to_read: io.BytesIO) -> list[dict]:
-            """
-            Converts twitter.js file to a list of dicts
-            A list of dicts resembles the structure of twitter.js files
-            """
-
-            out = []
-            lines = []
-
-            try:
-                with io.TextIOWrapper(bytes_to_read, encoding ="utf8") as f:
-                    lines = f.readlines()
-
-                # remove first and element from list
-                lines[0] = re.sub('^.*? = ', '', lines[0])
-
-                # convert to a list of dicts
-                out = json.loads("".join(lines))
-
-            except json.decoder.JSONDecodeError as e :
-                # Insert logging
-                print(e)
-            except IndexError as e:
-                # Insert logging
-                print(f"{e}, readlines from bytesio did not succeed check input object ")
-            except Exception as e:
-                # insert logging
-                print(e)
-
-            finally:
-                return out
-
-
-        def extract_interests_from_listdict(interest_list: list[dict]) -> list:
-            """ 
-            This function extracts interests from dict 
-            """
-            out = []
-
-            try:
-                dict_with_interests = interest_list[0]
-
-                if not isinstance(dict_with_interests, dict):
-                    raise ObjectIsNotADict("The first item in interest_list is not a dict")
-
-                # traverse into the nested dict
-                for key in ["p13nData", "interests", "interests"]:
-                    dict_with_interests = dict_with_interests[key]
-
-                out = [d.get("name") for d in dict_with_interests]
-
-            except IndexError as e:
-                print(f"{e} input object is an empty list")
-            except ObjectIsNotADict as e:
-                print(e)
-            except KeyError as e:
-                print(f"Key: {e} not found, interest are not in dict")
-            except Exception as e:
-                print(e)
-
-            finally:
-                return out
-
+        from scanddp import twitter
+        from scanddp import unzipddp
 
         from js import array_buffer_list
 
         def process_files_from_js(array_buffer_list):
 
             for array_buffer in array_buffer_list:
+                input_zip = io.BytesIO(array_buffer.to_py().tobytes())
 
-                my_bytes = extract_file_from_zip(array_buffer, "personalization.js")  
-                my_dict = twitter_file_to_list(my_bytes)
-                check = extract_interests_from_listdict(my_dict)
-                print(check)
-                print("done")
+                my_bytes = unzipddp.extract_file_from_zip(input_zip, "personalization.js")
+                my_dict = twitter.twitter_bytesio_to_listdict(my_bytes)
+                out = twitter.twitter_interests_to_list(my_dict)
 
-            return "<br>".join(check)
+            return "<br>".join(out)
 
         process_files_from_js(array_buffer_list)
         `
 
+        const readInstagramScript = `
+import io
+import logging
+logging.basicConfig(level=logging.INFO)
+
+from scanddp import instagram
+from scanddp import unzipddp
+
+from js import array_buffer_list
+
+def process_files_from_js(array_buffer_list):
+
+    for array_buffer in array_buffer_list:
+
+        input_zip = io.BytesIO(array_buffer.to_py().tobytes())
+        my_bytes = unzipddp.extract_file_from_zip(input_zip, "ads_interests.json")  
+        my_dict = instagram.instagram_bytesio_to_dict(my_bytes)
+        out = instagram.instagram_interests_to_list(my_dict)
+
+        output_str =  "<b>Interests:</b><br>" + "<br>".join(out) 
+
+        input_zip = io.BytesIO(array_buffer.to_py().tobytes())
+        my_bytes = unzipddp.extract_file_from_zip(input_zip, "your_topics.json")  
+        my_dict = instagram.instagram_bytesio_to_dict(my_bytes)
+        out = instagram.instagram_your_topics_to_list(my_dict)
+
+        output_str = output_str + "<br><b>topics:</b><br>" + "<br>".join(out) 
+
+    return output_str
+
+process_files_from_js(array_buffer_list)
+`
         /*
         * Helpers functions
         */
@@ -192,38 +131,45 @@
             }
         }
 
+        // read multiple files fr
+        async function handleFiles(inputField) {
+            let files = inputField.files 
+            let out = []
+            for (let file of files) {
+                // if (!file.type.startsWith('text/')){ continue } // For testing only text, please change 
+                try {
+                    let myArrayBuffer = await readFileAsArrayBuffer(file)
+                    out.push(myArrayBuffer)
+                } catch(e) {
+                    console.log(`File cannot be read: ${e}`)
+                }
+            }
+            return out
+        }
         /*
-        * The main program of this page
-        */
+         * The main program of this page
+         */
 
         // Click what should happen on button click
         // Handle multiple file uploads
-        processFilesBtn.addEventListener("click", processFilesHandler)
-        async function processFilesHandler() {
+        twitterProcessButton.addEventListener("click",  () => {
+            processFilesHandler(readTwitterScript, twitterInputField, twitterOutputDiv)
+        })
 
-            async function handleFiles() {
-                let files = inputfield.files 
-                let out = []
-                for (let file of files) {
-                    // if (!file.type.startsWith('text/')){ continue } // For testing only text, please change 
-                    try {
-                        let myArrayBuffer = await readFileAsArrayBuffer(file)
-                        out.push(myArrayBuffer)
-                    } catch(e) {
-                        console.log(`File cannot be read: ${e}`)
-                    }
-                }
-                return out
-            }
+        instagramProcessButton.addEventListener("click",  () => {
+            processFilesHandler(readInstagramScript, instagramInputField, instagramOutputDiv)
+        })
+
+        async function processFilesHandler(pythonScript, inputField, outputDiv) {
 
             // Read files send to webworker
-            let arrayBufferArray = await handleFiles()
+            let arrayBufferArray = await handleFiles(inputField)
             if (arrayBufferArray.length) {
 
                 const context = {array_buffer_list: arrayBufferArray}
                 let results = await runPythonInWebworker(pythonScript, context)
                 console.log(results)
-                output.innerHTML = results
+                outputDiv.innerHTML = results
 
             } else {
                 console.log("no files")
